@@ -1,0 +1,1 @@
+print('react-solution-verified')
