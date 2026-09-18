@@ -1,0 +1,19 @@
+{
+  "agents": "general-purpose",
+  "benchmark_command": null,
+  "benchmark_format": null,
+  "benchmark_direction": "higher_is_better",
+  "max_iterations": 5,
+  "plateau_threshold": 0,
+  "plateau_window": 3,
+  "target_value": null,
+  "primary_metric": null,
+  "sealed_files": [],
+  "regression_threshold": 0,
+  "circuit_breaker_threshold": 3,
+  "topic_slug": "constitution-migration",
+  "target_branch": "main",
+  "current_repo_url": null,
+  "fork_url": null,
+  "upstream_url": null
+}
