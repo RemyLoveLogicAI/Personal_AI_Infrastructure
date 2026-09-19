@@ -34,6 +34,13 @@ Library/Logs/
 node_modules/
 .npm
 .yarn
+
+# Tooling
+package-lock.json
+.husky/
+
+# Changelog
+CHANGELOG.md
 .pnp.*
 
 # IDE
@@ -63,6 +70,11 @@ out/
 # Cache
 .cache/
 *.cache
+
+# Local-only tool state and vendored checkouts
+.omx/
+.sandbox/
+agentic-awesome-skills/
 
 # Personal/Private data
 private/
