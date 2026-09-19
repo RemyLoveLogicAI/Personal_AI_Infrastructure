@@ -1,0 +1,30 @@
+{
+  "name": "personal-ai-infrastructure",
+  "version": "1.0.0",
+  "description": "Personal AI Infrastructure repository",
+  "private": true,
+  "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "conventional-changelog": "^4.0.0",
+    "eslint": "^8.0.0",
+    "husky": "^8.0.0",
+    "lint-staged": "^15.0.0",
+    "prettier": "^3.0.0"
+  },
+  "scripts": {
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
+    "format": "prettier --write .",
+    "prepare": "husky install",
+    "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
+  }
+}
