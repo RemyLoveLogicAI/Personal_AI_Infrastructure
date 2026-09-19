@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Agent Operations</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#operations" aria-label="Agent Operations home"><span class="brand-mark">A</span><span><strong>Agent Ops</strong><small>Control center</small></span></a>
+      <nav class="nav" aria-label="Dashboard views">
+        <button class="nav-item is-active" data-view-target="operations" aria-current="page"><span aria-hidden="true">⌁</span>Operations</button>
+        <button class="nav-item" data-view-target="workboard"><span aria-hidden="true">▦</span>Workboard</button>
+      </nav>
+      <div class="sidebar-footer"><span class="pulse-dot" aria-hidden="true"></span><span>Local dashboard</span><small>Private by default</small></div>
+    </aside>
+
+    <header class="topbar">
+      <div><p class="eyebrow">Mission control</p><h1 id="page-title">Operations</h1></div>
+      <div class="topbar-actions">
+        <span id="source-chip" class="source-chip"><span class="status-dot unknown"></span><span>Awaiting snapshot</span></span>
+        <button id="refresh-button" class="button secondary" type="button">Refresh</button>
+        <button id="customize-button" class="button icon-button" type="button" aria-expanded="false" aria-controls="customize-panel" aria-label="Customize widgets">⚙</button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <section id="customize-panel" class="customize-panel" hidden>
+        <div><strong>Visible widgets</strong><p>Choose the cards that belong on your dashboard.</p></div>
+        <div id="widget-toggles" class="toggle-list"></div>
+      </section>
+
+      <section id="operations-view" class="view is-active" aria-labelledby="page-title">
+        <div id="telemetry-alert" class="alert" role="status" aria-live="polite" hidden></div>
+        <section class="snapshot-bar" data-widget="snapshot" data-widget-label="Snapshot details">
+          <div><span class="label">Source snapshot</span><strong id="snapshot-time">Never received</strong></div>
+          <div><span class="label">Freshness</span><strong id="snapshot-freshness">Unknown</strong></div>
+          <form id="import-form" class="import-form">
+            <label class="file-button" for="telemetry-file">Choose JSON</label>
+            <input id="telemetry-file" type="file" accept="application/json,.json">
+            <button class="button secondary" type="submit">Import snapshot</button>
+          </form>
+        </section>
+
+        <section class="kpi-grid" data-widget="overview" data-widget-label="Operations overview">
+          <article class="widget kpi"><span class="label">Connected agents</span><strong id="kpi-connected">—</strong><small id="kpi-connected-note">No snapshot</small></article>
+          <article class="widget kpi"><span class="label">Active sessions</span><strong id="kpi-sessions">—</strong><small>Across reported agents</small></article>
+          <article class="widget kpi"><span class="label">Tokens consumed</span><strong id="kpi-tokens">—</strong><small>Normalized snapshot total</small></article>
+          <article class="widget kpi"><span class="label">Gateway health</span><strong id="kpi-gateway">Unknown</strong><small id="kpi-gateway-note">No gateway data</small></article>
+        </section>
+
+        <section class="agent-section" data-widget="agents" data-widget-label="Agent fleet">
+          <div class="section-heading"><div><p class="eyebrow">Fleet</p><h2>Agent status</h2></div><span id="agent-count" class="muted">4 monitored</span></div>
+          <div id="agent-grid" class="agent-grid"></div>
+        </section>
+
+        <section class="widget dreams-widget" data-widget="dreams" data-widget-label="Dreaming log">
+          <div class="section-heading"><div><p class="eyebrow">Activity</p><h2>Dreaming log</h2></div><span class="live-label"><span class="pulse-dot"></span>Latest first</span></div>
+          <ol id="dream-list" class="timeline"><li class="empty-state">No dreaming entries in this snapshot.</li></ol>
+        </section>
+      </section>
+
+      <section id="workboard-view" class="view" aria-labelledby="page-title" hidden>
+        <div id="storage-alert" class="alert error" role="alert" hidden></div>
+        <section class="widget task-widget" data-widget="tasks" data-widget-label="Task workboard">
+          <div class="section-heading"><div><p class="eyebrow">Focus</p><h2>Task workboard</h2></div></div>
+          <form id="task-form" class="inline-form"><label><span>New task</span><input id="task-title" required maxlength="120" placeholder="What needs doing?"></label><label><span>Column</span><select id="task-status"><option value="backlog">Backlog</option><option value="doing">In progress</option><option value="done">Done</option></select></label><button class="button primary" type="submit">Add task</button></form>
+          <div id="kanban" class="kanban"></div>
+        </section>
+
+        <div class="workboard-grid">
+          <section class="widget" data-widget="habits" data-widget-label="Daily habits">
+            <div class="section-heading"><div><p class="eyebrow">Rhythm</p><h2>Daily habits</h2></div><span id="habit-score" class="score">0 / 0</span></div>
+            <form id="habit-form" class="compact-form"><label><span>Add habit</span><input id="habit-title" required maxlength="80" placeholder="Daily practice"></label><button class="button secondary" type="submit">Add</button></form>
+            <div id="habit-list" class="check-list"></div>
+          </section>
+
+          <section class="widget" data-widget="memory" data-widget-label="Memory review">
+            <div class="section-heading"><div><p class="eyebrow">Recall</p><h2>Memory review</h2></div><span id="memory-count" class="score">0 pending</span></div>
+            <form id="memory-form" class="compact-form"><label><span>Add memory</span><input id="memory-text" required maxlength="180" placeholder="Something worth revisiting"></label><button class="button secondary" type="submit">Add</button></form>
+            <div id="memory-list" class="memory-list"></div>
+          </section>
+
+          <section class="widget graph-widget" data-widget="knowledge" data-widget-label="Knowledge graph">
+            <div class="section-heading"><div><p class="eyebrow">Connections</p><h2>Knowledge graph</h2></div><span id="node-count" class="score">0 nodes</span></div>
+            <div class="graph-forms">
+              <form id="node-form" class="compact-form"><label><span>New node</span><input id="node-label" required maxlength="40" placeholder="Topic or person"></label><button class="button secondary" type="submit">Add node</button></form>
+              <form id="link-form" class="compact-form"><label><span>From</span><select id="link-source" required></select></label><label><span>To</span><select id="link-target" required></select></label><button class="button secondary" type="submit">Connect</button></form>
+            </div>
+            <div class="graph-stage"><svg id="knowledge-graph" viewBox="0 0 720 330" role="img" aria-label="Knowledge graph"></svg><p id="graph-empty" class="empty-state">Add nodes to begin mapping connections.</p></div>
+            <ul id="node-list" class="node-list" aria-label="Knowledge nodes"></ul>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="/app.js" defer></script>
+</body>
+</html>
