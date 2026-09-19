@@ -1,0 +1,12 @@
+{
+  "name": "skill-registry",
+  "version": "0.1.0",
+  "description": "MCP skill registry for frontier experimental skills",
+  "type": "mcp",
+  "resources": {
+    "skills": {
+      "path": "./skills",
+      "type": "directory"
+    }
+  }
+}
