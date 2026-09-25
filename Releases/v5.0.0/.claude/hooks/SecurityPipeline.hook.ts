@@ -1,5 +1,136 @@
 #!/usr/bin/env bun
 /**
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
  * SecurityPipeline.hook.ts — PreToolUse entry point
  *
  * Runs the inspector pipeline on every Bash, Write, Edit, and MultiEdit
@@ -14,11 +145,13 @@ import { InspectorPipeline } from './security/pipeline';
 import { createPatternInspector } from './security/inspectors/PatternInspector';
 import { createEgressInspector } from './security/inspectors/EgressInspector';
 import { createRulesInspector } from './security/inspectors/RulesInspector';
+import { createGate } from './security/cockpit';
 
 interface HookInput {
   session_id: string;
   tool_name: string;
   tool_input: Record<string, unknown> | string;
+  agent_type?: string;
 }
 
 const pipeline = new InspectorPipeline([
@@ -43,6 +176,7 @@ async function main(): Promise<void> {
     sessionId: input.session_id,
     toolName: input.tool_name,
     toolInput: input.tool_input,
+    agent_type: input.agent_type,
   };
 
   const result = await pipeline.run(ctx);
@@ -54,6 +188,9 @@ async function main(): Promise<void> {
       break;
 
     case 'require_approval':
+      // Fire-and-forget cockpit gate creation
+      createGate('action', 'warning', input.agent_type ?? 'unknown', input.tool_name, result.reason ?? 'Approval required')
+        .catch((e) => console.error('[cockpit] gate creation error:', String(e)))
       console.log(JSON.stringify({
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',

@@ -5,15 +5,29 @@ on:
     branches: [main]
   pull_request:
 
+# Cancel superseded runs on the same ref so a busy branch does not stack jobs.
+concurrency:
+  group: security-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege, declared at the top level so any future job inherits it.
 permissions:
   contents: read
 
 jobs:
   validate-protected:
     runs-on: ubuntu-latest
+    # Bound the job: this runs repo-controlled code, so cap the blast radius.
+    timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # This job executes code from the checked-out tree. Without this, the
+          # GITHUB_TOKEN is written to .git/config and that code can read it.
+          persist-credentials: false
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0

@@ -97,6 +97,11 @@ credentials/
 .agents/mcp_config.json
 .omp/mcp.json
 .agents/mcp.json
+# StatsHUD build output
+/StatsHUD/dist/
+/StatsHUD/build/
+/StatsHUD/.next/
+/StatsHUD/node_modules/
 .devin/mcp_config.json
 .aider*
 .grok/config.toml
