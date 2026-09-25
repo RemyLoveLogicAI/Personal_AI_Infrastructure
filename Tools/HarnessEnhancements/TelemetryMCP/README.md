@@ -6,12 +6,18 @@ The TelemetryMCP server acts as a universal bridge connecting your AI agents (ac
 
 ## Capabilities
 
-The server exposes five MCP tools:
+The server exposes eleven universal MCP tools:
 - `telemetry_set_status`: Sets the agent's current state (`online`, `idle`, `error`, etc.) and gateway health.
 - `telemetry_add_metrics`: Increments cumulative session stats like tokens, number of sessions, and credits.
-- `telemetry_log_dream`: Pushes an entry to the dreaming log.
-- `ledger_checkpoint_save`: Write the current state of a task to the Universal Context Ledger (`~/.agentsroom/universal_ledger.json`) so other agents can resume it.
-- `ledger_checkpoint_load`: Read the Universal Context Ledger to resume a task left by another agent.
+- `telemetry_log_dream`: Pushes an entry to the background dreaming log.
+- `telemetry_sync_backlog`: Pushes task items to the Operations Dashboard workboard.
+- `telemetry_request_guidance`: Requests user guidance or decisions from the human operator via the Operations Dashboard.
+- `telemetry_resolve_guidance`: Marks a guidance request as resolved with the user's response.
+- `telemetry_report_milestone`: Reports high-level executive milestones and deliverables to the user's dashboard feed.
+- `telemetry_set_user_intent`: Updates the user's strategic focus, Telos, and top priorities in the central ledger.
+- `telemetry_get_user_intent`: Queries the user's active intent so any agent across harnesses stays aligned.
+- `ledger_checkpoint_save`: Writes task state to the Universal Context Ledger (`~/.agentsroom/universal_ledger.json`) for cross-harness handoff.
+- `ledger_checkpoint_load`: Reads the Universal Context Ledger to resume a task left by another agent.
 
 ## How it works
 
