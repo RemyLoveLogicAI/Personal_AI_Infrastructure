@@ -103,4 +103,40 @@ describe("gates bus", () => {
     const invalid = await post("/api/gates", makeGate({ kind: "weird" }))
     expect(invalid.status).toBe(400)
   })
+
+  test("check returns ask when nothing is approved", async () => {
+    const created = await post("/api/gates", makeGate({ fingerprint: "fp-check-ask" }))
+    expect(created.status).toBe(201)
+    const checked = await post("/api/gates/check", { fingerprint: "fp-check-ask" })
+    expect(checked.status).toBe(200)
+    expect((await checked.json()).decision).toBe("ask")
+  })
+
+  test("check allows an approved gate exactly once, then asks again", async () => {
+    const created = await post("/api/gates", makeGate({ fingerprint: "fp-once" }))
+    const { gate } = await created.json()
+    await post("/api/gates/decide", { id: gate.id, decision: "approve" }, { "X-PAI-Token": token() })
+
+    const first = await post("/api/gates/check", { fingerprint: "fp-once" })
+    expect((await first.json()).decision).toBe("allow")
+
+    const second = await post("/api/gates/check", { fingerprint: "fp-once" })
+    expect((await second.json()).decision).toBe("ask")
+  })
+
+  test("check denies when the gate was recently denied", async () => {
+    const created = await post("/api/gates", makeGate({ fingerprint: "fp-deny" }))
+    const { gate } = await created.json()
+    await post("/api/gates/decide", { id: gate.id, decision: "deny" }, { "X-PAI-Token": token() })
+
+    const checked = await post("/api/gates/check", { fingerprint: "fp-deny" })
+    const body = await checked.json()
+    expect(body.decision).toBe("deny")
+    expect(body.reason).toBeTruthy()
+  })
+
+  test("check requires a fingerprint", async () => {
+    const checked = await post("/api/gates/check", {})
+    expect(checked.status).toBe(400)
+  })
 })

@@ -18,6 +18,8 @@ const PULSE_DIR = join(HOME, ".claude", "PAI", "PULSE")
 const STATE_DIR = process.env.PAI_GATES_DIR ?? join(PULSE_DIR, "state")
 const GATES_FILE = join(STATE_DIR, "gates.json")
 const TOKEN_FILE = join(STATE_DIR, "cockpit.token")
+// An approval is valid for 10 minutes from when it was decided.
+const APPROVAL_TTL_MS = 10 * 60_000
 
 export type GateKind = "action" | "loop"
 export type GateSeverity = "warning" | "caution"
@@ -187,6 +189,32 @@ export async function handleGatesRequest(req: Request, pathname: string): Promis
     return Response.json({ gate })
   }
 
+  // POST /api/gates/check — unauthenticated read-and-consume.
+  // Decides what the hook should do for this fingerprint. Consuming here (rather
+  // than in a separate call) keeps approve→allow atomic for concurrent retries.
+  if (req.method === "POST" && pathname === "/api/gates/check") {
+    const fingerprint = str(body.fingerprint)
+    if (!fingerprint) return bad(body, "fingerprint required")
+
+    const denied = findRecentDenied(fingerprint)
+    if (denied) {
+      return Response.json({ decision: "deny", reason: denied.detail || "recently denied" })
+    }
+
+    const gate = gates.find(g => g.fingerprint === fingerprint && g.status === "approved")
+    if (!gate) return Response.json({ decision: "ask", reason: "no approved gate" })
+
+    const expired = gate.decidedAt !== undefined &&
+      new Date(gate.decidedAt).getTime() < Date.now() - APPROVAL_TTL_MS
+    if (expired) return Response.json({ decision: "ask", reason: "approval expired" })
+
+    // Exactly-once: flip to consumed before answering so a parallel retry cannot
+    // also observe the approval.
+    gate.status = "consumed"
+    persist()
+    return Response.json({ decision: "allow", gateId: gate.id })
+  }
+
   // POST /api/gates/consume — unauthenticated (consumption only removes rights)
   if (req.method === "POST" && pathname === "/api/gates/consume") {
     const fingerprint = str(body.fingerprint)
@@ -196,7 +224,7 @@ export async function handleGatesRequest(req: Request, pathname: string): Promis
     )
     if (!gate) return Response.json({ consumed: false, reason: "no approved gate" }, { status: 409 })
     if (gate.status === "consumed") return Response.json({ consumed: false, reason: "already consumed" }, { status: 409 })
-    if (gate.decidedAt && new Date(gate.decidedAt).getTime() < Date.now() - 10 * 60_000) {
+    if (gate.decidedAt && new Date(gate.decidedAt).getTime() < Date.now() - APPROVAL_TTL_MS) {
       return Response.json({ consumed: false, reason: "approval expired" }, { status: 409 })
     }
     gate.status = "consumed"

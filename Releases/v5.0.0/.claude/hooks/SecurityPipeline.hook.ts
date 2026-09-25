@@ -145,7 +145,7 @@ import { InspectorPipeline } from './security/pipeline';
 import { createPatternInspector } from './security/inspectors/PatternInspector';
 import { createEgressInspector } from './security/inspectors/EgressInspector';
 import { createRulesInspector } from './security/inspectors/RulesInspector';
-import { createGate } from './security/cockpit';
+import { createGate, checkGate, fingerprintFor } from './security/cockpit';
 
 interface HookInput {
   session_id: string;
@@ -187,9 +187,27 @@ async function main(): Promise<void> {
       process.exit(2);
       break;
 
-    case 'require_approval':
-      // Fire-and-forget cockpit gate creation
-      createGate('action', 'warning', input.agent_type ?? 'unknown', input.tool_name, result.reason ?? 'Approval required')
+    case 'require_approval': {
+      // The gate bus is authoritative: a cockpit approval lets this exact
+      // action through once, a recent denial blocks it outright, and an
+      // undecided gate falls back to prompting.
+      const fingerprint = fingerprintFor(input.tool_name, input.tool_input);
+      const decision = await checkGate(fingerprint);
+
+      if (decision === 'deny') {
+        console.error('[PAI SECURITY] 🚫 DENIED by cockpit: ' + (result.reason ?? 'recently denied'));
+        process.exit(2);
+        break;
+      }
+
+      if (decision === 'allow') {
+        console.error('[PAI SECURITY] ✅ approved by cockpit — allowing once');
+        break;
+      }
+
+      // Undecided: record the gate (fire-and-forget) and prompt.
+      createGate('action', 'warning', input.agent_type ?? 'unknown', input.tool_name,
+        result.reason ?? 'Approval required', fingerprint)
         .catch((e) => console.error('[cockpit] gate creation error:', String(e)))
       console.log(JSON.stringify({
         hookSpecificOutput: {
@@ -199,6 +217,7 @@ async function main(): Promise<void> {
         },
       }));
       break;
+    }
 
     case 'alert':
       console.error(`[PAI SECURITY] ⚠️ ALERT: ${result.reason}`);
