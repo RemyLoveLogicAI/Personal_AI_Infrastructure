@@ -1,10 +1,10 @@
-import { FlatCompat } from "@eslint/eslintrc";
-const compat = new FlatCompat({
-  baseDirectory: import.meta.dirname,
-});
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
 
-const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  ...nextTs,
   {
     rules: {
       // TS handles undefined globals; no-undef misfires on React.ReactNode
@@ -12,9 +12,8 @@ const eslintConfig = [
       "no-undef": "off",
     },
   },
-  {
-    ignores: [".next/**", "out/**", "build/**", "next-env.d.ts"],
-  },
-];
+  // Default ignores of eslint-config-next, re-declared explicitly.
+  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
+]);
 
 export default eslintConfig;
