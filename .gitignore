@@ -37,12 +37,14 @@ node_modules/
 .next/
 
 # Tooling
-package-lock.json
 .husky/
 
 # Changelog
 CHANGELOG.md
 .pnp.*
+
+# Local Claude settings (machine-specific hooks and paths)
+.claude/settings.local.json
 
 # IDE
 .vscode/
@@ -97,3 +99,4 @@ credentials/
 .agents/mcp.json
 .devin/mcp_config.json
 .aider*
+.grok/config.toml
