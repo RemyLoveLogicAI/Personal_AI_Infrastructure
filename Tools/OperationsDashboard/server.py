@@ -14,7 +14,8 @@ MAX_BODY = 1024 * 1024
 
 def empty_snapshot():
     return {'updatedAt': None, 'agents': [dict(name=n, status='disconnected', sessions=None,
-            tokens=None, credits=None, gateway=None) for n in NAMES], 'dreams': []}
+            tokens=None, credits=None, gateway=None) for n in NAMES], 'dreams': [],
+            'ledger': None, 'backlog': [], 'guidance': [], 'milestones': [], 'user_intent': None}
 
 
 def validate(data):
@@ -58,7 +59,62 @@ def validate(data):
         if not isinstance(entry, dict) or any(not isinstance(entry.get(k), str) or len(entry[k]) > 4000 for k in ('time', 'agent', 'message')):
             raise ValueError('Dream entries require bounded time, agent and message strings')
         cleaned.append({k: entry[k] for k in ('time', 'agent', 'message')})
-    return {'updatedAt': stamp, 'agents': result, 'dreams': cleaned}
+
+    guidance = data.get('guidance', [])
+    if not isinstance(guidance, list) or len(guidance) > 100:
+        raise ValueError('guidance must contain at most 100 entries')
+    cleaned_guidance = []
+    for entry in guidance:
+        if not isinstance(entry, dict) or not isinstance(entry.get('id'), str) or not isinstance(entry.get('question'), str):
+            continue
+        cleaned_guidance.append({
+            'id': entry['id'][:100],
+            'agent': str(entry.get('agent', 'Unknown'))[:100],
+            'question': entry['question'][:4000],
+            'options': [str(opt)[:500] for opt in entry.get('options', []) if isinstance(opt, (str, int, float))][:10],
+            'context': str(entry.get('context', ''))[:4000],
+            'time': str(entry.get('time', ''))[:100],
+            'status': str(entry.get('status', 'pending'))[:50],
+            'resolution': str(entry.get('resolution', ''))[:4000] if entry.get('resolution') is not None else None
+        })
+
+    milestones = data.get('milestones', [])
+    if not isinstance(milestones, list) or len(milestones) > 200:
+        raise ValueError('milestones must contain at most 200 entries')
+    cleaned_milestones = []
+    for entry in milestones:
+        if not isinstance(entry, dict) or not isinstance(entry.get('title'), str):
+            continue
+        cleaned_milestones.append({
+            'id': str(entry.get('id', ''))[:100],
+            'time': str(entry.get('time', ''))[:100],
+            'agent': str(entry.get('agent', 'System'))[:100],
+            'title': entry['title'][:500],
+            'description': str(entry.get('description', ''))[:4000],
+            'category': str(entry.get('category', 'general'))[:50],
+            'artifacts': [str(art)[:500] for art in entry.get('artifacts', []) if isinstance(art, str)][:20]
+        })
+
+    user_intent = data.get('user_intent')
+    cleaned_intent = None
+    if isinstance(user_intent, dict):
+        cleaned_intent = {
+            'focus': str(user_intent.get('focus', ''))[:1000],
+            'telos': str(user_intent.get('telos', ''))[:2000],
+            'priorities': [str(p)[:500] for p in user_intent.get('priorities', []) if isinstance(p, str)][:20],
+            'updatedAt': str(user_intent.get('updatedAt', ''))[:100]
+        }
+
+    return {
+        'updatedAt': stamp,
+        'agents': result,
+        'dreams': cleaned,
+        'ledger': data.get('ledger'),
+        'backlog': data.get('backlog') or [],
+        'guidance': cleaned_guidance,
+        'milestones': cleaned_milestones,
+        'user_intent': cleaned_intent
+    }
 
 
 class DashboardServer(ThreadingHTTPServer):

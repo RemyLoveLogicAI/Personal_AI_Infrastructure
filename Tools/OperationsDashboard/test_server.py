@@ -32,6 +32,19 @@ class Validation(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate(dict(SAMPLE, agents=SAMPLE['agents'] * 2))
 
+    def test_user_centric_fields_validated(self):
+        sample = dict(SAMPLE,
+            guidance=[{'id': 'g-1', 'agent': 'Hermes', 'question': 'Confirm deployment?', 'options': ['Yes', 'No'], 'time': '2026-01-01T00:00:00Z', 'status': 'pending'}],
+            milestones=[{'id': 'm-1', 'time': '2026-01-01T00:00:00Z', 'agent': 'Codex', 'title': 'Milestone 1', 'description': 'Done', 'category': 'feature'}],
+            user_intent={'focus': 'Enhance infrastructure', 'telos': 'Autonomy', 'priorities': ['Stability']}
+        )
+        data = validate(sample)
+        self.assertEqual(len(data['guidance']), 1)
+        self.assertEqual(data['guidance'][0]['id'], 'g-1')
+        self.assertEqual(len(data['milestones']), 1)
+        self.assertEqual(data['milestones'][0]['title'], 'Milestone 1')
+        self.assertEqual(data['user_intent']['focus'], 'Enhance infrastructure')
+
 
 class API(unittest.TestCase):
     def setUp(self):
