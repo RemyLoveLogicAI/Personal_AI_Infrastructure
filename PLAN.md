@@ -19,5 +19,8 @@ Status: **Complete** (all three phases implemented and verified)
 
 ## Notes
 - Replaces the broken zustand scaffold that the `feat(telemetry)` commit swept in (duplicate imports/declarations; empty stub files).
-- Persistence follows the repo's "text over opaque storage" doctrine: one pretty-printed JSON snapshot file.
+- Persistence follows the repo's "text over opaque storage" doctrine: one pretty-printed JSON snapshot file, written atomically (temp + rename).
 - Run everything with: `bun run verify`
+
+## QA hardening pass (2026-09-25)
+QA probe pass found 4 defects (see `QA_TASKS.md`, all `fixed-verified`): snapshot-diff false positives, missing snapshot shape validation on load, unenforced JSON-safety contract on writes, and memory/disk divergence on persist failure. Regression tests added (9); suite now 35 tests, all green.

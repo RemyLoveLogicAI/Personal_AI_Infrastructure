@@ -76,6 +76,11 @@ out/
 *.cache
 *.tsbuildinfo
 
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
 # Local-only tool state and vendored checkouts
 .omx/
 .sandbox/

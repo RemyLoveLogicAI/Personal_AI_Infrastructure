@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -84,5 +84,50 @@ describe('state (persisted global store)', () => {
     persistState();
     const raw = fs.readFileSync(process.env.PAI_STATE_PATH as string, 'utf8');
     expect(JSON.parse(raw)).toEqual({});
+  });
+
+  test('loads a valid-JSON but invalid-shape file as an empty store (QA-002)', () => {
+    // Valid JSON, but not a valid StateSnapshot: value is a bare number.
+    fs.writeFileSync(process.env.PAI_STATE_PATH as string, '{"a": 42}', 'utf8');
+
+    reloadState();
+    expect(getState().size).toBe(0);
+    expect(state.get('a')).toBeUndefined();
+  });
+
+  test('rejects snapshot files whose entries are missing lifecycle fields (QA-002)', () => {
+    // Entry missing value/revision/createdAt/updatedAt entirely.
+    fs.writeFileSync(
+      process.env.PAI_STATE_PATH as string,
+      '{"a": {"id": "a"}}',
+      'utf8'
+    );
+
+    reloadState();
+    expect(getState().size).toBe(0);
+  });
+
+  test('a persisted snapshot still reloads after shape validation (QA-002)', () => {
+    state.set('ok', { nested: [1] });
+    persistState();
+
+    reloadState();
+    expect(state.get('ok')).toEqual({ nested: [1] });
+  });
+
+  test('a failed persist does not leave the in-memory store updated (QA-004)', () => {
+    state.set('stable', 'before');
+
+    const writeSpy = spyOn(fs, 'writeFileSync').mockImplementation(() => {
+      throw new Error('disk full (simulated)');
+    });
+    try {
+      expect(() => state.set('stable', 'after')).toThrow('disk full');
+    } finally {
+      writeSpy.mockRestore();
+    }
+
+    // In-memory store must be unchanged; disk still holds the previous value.
+    expect(state.get('stable')).toBe('before');
   });
 });

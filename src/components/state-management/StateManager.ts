@@ -9,6 +9,7 @@ import {
   type StateTransition,
   type StateValue,
 } from './types';
+import { assertJsonValue } from './utils';
 
 /** Monotonic clock helper — isolated for tests to stub if ever needed. */
 const now = (): number => Date.now();
@@ -58,6 +59,7 @@ export class StateManager {
   /** Create a new entry. Throws if the id already exists. */
   create(id: StateId, value: StateValue): StateEntry {
     assertId(id);
+    assertJsonValue(value);
     if (this.entries.has(id)) {
       throw new StateInvalidError(`State entry already exists: ${id}`);
     }
@@ -88,6 +90,7 @@ export class StateManager {
   /** Overwrite an entry's value wholesale. */
   set(id: StateId, value: StateValue): StateEntry {
     assertId(id);
+    assertJsonValue(value);
     const existing = this.entries.get(id);
     if (!existing) throw new StateNotFoundError(id);
     existing.value = cloneValue(value);
@@ -99,6 +102,7 @@ export class StateManager {
   /** Shallow-merge a patch into an object-valued entry. */
   patch(id: StateId, patch: StatePatch): StateEntry {
     assertId(id);
+    assertJsonValue(patch, 'patch');
     const existing = this.entries.get(id);
     if (!existing) throw new StateNotFoundError(id);
     const value = existing.value;
@@ -127,9 +131,12 @@ export class StateManager {
     const existing = this.entries.get(id);
     if (existing) {
       const next = transition(cloneValue(existing.value));
+      // set() re-validates, but check first so a bad return never mutates.
+      assertJsonValue(next, 'transition return');
       return this.set(id, next);
     }
     const next = transition(undefined);
+    assertJsonValue(next, 'transition return');
     return this.create(id, next);
   }
 

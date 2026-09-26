@@ -4,6 +4,7 @@ import {
   diffSnapshot,
   mergePatch,
 } from './utils';
+import { StateManager } from './StateManager';
 
 describe('deepEqual', () => {
   test('primitives and identity', () => {
@@ -34,6 +35,35 @@ describe('mergePatch', () => {
 });
 
 describe('diffSnapshot', () => {
+  test('no false positives between two snapshots of an unchanged store (QA-001)', () => {
+    const sm = new StateManager();
+    sm.create('cfg', { theme: 'dark', nested: { deep: [1, 2, 3] } });
+    sm.create('plain', 'text');
+    sm.create('arr', [1, 2]);
+
+    // snapshot() deep-clones, so entry/value references never match across
+    // snapshots; diffSnapshot must compare structurally, not by identity.
+    const d = diffSnapshot(sm.snapshot(), sm.snapshot());
+    expect(d).toEqual({ added: [], removed: [], changed: [] });
+  });
+
+  test('still detects value changes, adds, and removals on cloned snapshots (QA-001)', () => {
+    const sm = new StateManager();
+    sm.create('obj', { a: 1 });
+    sm.create('gone', 'x');
+    const before = sm.snapshot();
+
+    sm.set('obj', { a: 2 });
+    sm.create('new', true);
+    sm.delete('gone');
+
+    expect(diffSnapshot(before, sm.snapshot())).toEqual({
+      added: ['new'],
+      removed: ['gone'],
+      changed: ['obj'],
+    });
+  });
+
   test('computes added/removed/changed', () => {
     const mk = (value: unknown, revision = 0) =>
       ({

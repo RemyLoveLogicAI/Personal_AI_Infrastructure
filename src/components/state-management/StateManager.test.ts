@@ -128,4 +128,48 @@ describe('StateManager', () => {
 
     expect(sm.get('obj').value).toEqual({ inner: 1 });
   });
+
+  describe('JSON-safety boundary (QA-003)', () => {
+    test('patch with an explicit undefined key is rejected and leaves the store unchanged', () => {
+      const sm = new StateManager();
+      sm.create('profile', { name: 'ada', role: 'engineer' });
+
+      // JS callers can smuggle undefined past the type system.
+      expect(() =>
+        (
+          sm as never as {
+            patch: (id: string, p: Record<string, unknown>) => unknown;
+          }
+        ).patch('profile', { role: undefined })
+      ).toThrow(StateInvalidError);
+      expect(sm.get('profile').value).toEqual({ name: 'ada', role: 'engineer' });
+    });
+
+    test('set with NaN is rejected and leaves the previous value intact', () => {
+      const sm = new StateManager();
+      sm.create('num', 1);
+
+      expect(() =>
+        (sm as never as { set: (id: string, v: unknown) => unknown }).set(
+          'num',
+          NaN
+        )
+      ).toThrow(StateInvalidError);
+      expect(sm.get('num').value).toBe(1);
+    });
+
+    test('transition returning undefined is rejected and does not create the entry', () => {
+      const sm = new StateManager();
+
+      expect(() =>
+        (sm as never as {
+          transition: (
+            id: string,
+            t: (current: unknown) => unknown
+          ) => unknown;
+        }).transition('x', () => undefined)
+      ).toThrow(StateInvalidError);
+      expect(sm.has('x')).toBe(false);
+    });
+  });
 });

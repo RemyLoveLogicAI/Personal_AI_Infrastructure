@@ -28,9 +28,35 @@ jobs:
           # This job executes code from the checked-out tree. Without this, the
           # GITHUB_TOKEN is written to .git/config and that code can read it.
           persist-credentials: false
+          fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
-      - name: Validate protected files
-        run: bun Tools/validate-protected.ts
+      # Fetch the base in its own step so the validator process never sees the token.
+      - name: Fetch the revision to diff against
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          FETCH_TOKEN: ${{ github.token }}
+        run: |
+          ZERO=0000000000000000000000000000000000000000
+          if [ -z "${BASE_SHA}" ] || [ "${BASE_SHA}" = "$ZERO" ]; then
+            echo "SCAN_MODE=tracked" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "SCAN_MODE=since" >> "$GITHUB_ENV"
+          echo "SCAN_BASE=${BASE_SHA}" >> "$GITHUB_ENV"
+          if git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            exit 0
+          fi
+          git -c "http.extraheader=AUTHORIZATION: bearer ${FETCH_TOKEN}" fetch --no-tags --depth=1 origin "${BASE_SHA}"
+
+      - name: Validate protected files and scan the change
+        run: |
+          if [ "${SCAN_MODE}" = "tracked" ]; then
+            echo "No parent revision. Scanning every tracked file."
+            bun Tools/validate-protected.ts --tracked
+          else
+            bun Tools/validate-protected.ts --since "${SCAN_BASE}"
+          fi

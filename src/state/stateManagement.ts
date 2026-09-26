@@ -17,6 +17,7 @@ import {
 import { StateManager } from '../components/state-management/StateManager';
 import type {
   StateId,
+  StateSnapshot,
   StateValue,
 } from '../components/state-management/types';
 
@@ -28,6 +29,19 @@ function storagePath(): string {
 }
 
 let globalStore: StateManager | null = null;
+
+/**
+ * Persist `snapshot` atomically: write to a temp file in the same directory,
+ * then rename over the target. A crash mid-write can never leave a partial
+ * store file behind.
+ */
+function persistSnapshot(snapshot: StateSnapshot): void {
+  const target = storagePath();
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  const tmp = `${target}.tmp`;
+  fs.writeFileSync(tmp, serializeSnapshot(snapshot), 'utf8');
+  fs.renameSync(tmp, target);
+}
 
 /** Get the process-wide shared store, loading persisted state on first use. */
 export function getState(): StateManager {
@@ -43,14 +57,9 @@ export function getState(): StateManager {
   return globalStore;
 }
 
-/** Persist the current snapshot as pretty-printed JSON. */
+/** Persist the current snapshot as pretty-printed JSON (atomic write). */
 export function persistState(): void {
-  fs.mkdirSync(path.dirname(storagePath()), { recursive: true });
-  fs.writeFileSync(
-    storagePath(),
-    serializeSnapshot(getState().snapshot()),
-    'utf8'
-  );
+  persistSnapshot(getState().snapshot());
 }
 
 /** Reset the shared store to empty in memory (does not touch disk). */
@@ -71,30 +80,57 @@ export const state = {
     return entry ? entry.value : fallback;
   },
 
-  /** Create-or-overwrite a value and persist immediately. */
+  /** Create-or-overwrite a value and persist immediately (rolls back on persist failure). */
   set(id: StateId, value: StateValue): void {
     const manager = getState();
-    if (manager.has(id)) {
+    const existed = manager.has(id);
+    const previous = existed ? manager.get(id) : undefined;
+    if (existed) {
       manager.set(id, value);
     } else {
       manager.create(id, value);
     }
-    persistState();
+    try {
+      persistSnapshot(manager.snapshot());
+    } catch (err) {
+      // Roll the in-memory store back so memory and disk cannot diverge (QA-004).
+      if (existed && previous) manager.set(id, previous.value);
+      else manager.delete(id);
+      throw err;
+    }
   },
 
-  /** Apply a pure transition (e.g. counters) and persist immediately. */
+  /** Apply a pure transition (e.g. counters) and persist immediately (rolls back on persist failure). */
   update(
     id: StateId,
     transition: (current: StateValue | undefined) => StateValue
   ): void {
-    getState().transition(id, transition);
-    persistState();
+    const manager = getState();
+    const existed = manager.has(id);
+    const previous = existed ? manager.get(id) : undefined;
+    manager.transition(id, transition);
+    try {
+      persistSnapshot(manager.snapshot());
+    } catch (err) {
+      if (existed && previous) manager.set(id, previous.value);
+      else manager.delete(id);
+      throw err;
+    }
   },
 
-  /** Delete a value and persist immediately. */
+  /** Delete a value and persist immediately (rolls back on persist failure). */
   remove(id: StateId): void {
-    getState().delete(id);
-    persistState();
+    const manager = getState();
+    const existed = manager.has(id);
+    const previous = existed ? manager.get(id) : undefined;
+    manager.delete(id);
+    try {
+      persistSnapshot(manager.snapshot());
+    } catch (err) {
+      if (existed && previous) manager.set(id, previous.value);
+      else manager.delete(id);
+      throw err;
+    }
   },
 };
 
