@@ -45,16 +45,82 @@
           </form>
         </section>
 
+        <section class="widget intent-widget" data-widget="intent" data-widget-label="Strategic intent & Telos">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Mission Alignment</p>
+              <h2>Strategic intent & Telos</h2>
+            </div>
+            <button id="edit-intent-btn" class="button secondary" type="button">Update Intent</button>
+          </div>
+          <div id="intent-display" class="intent-display">
+            <div class="intent-row">
+              <span class="label">Current Focus</span>
+              <p id="intent-focus" class="intent-text">—</p>
+            </div>
+            <div class="intent-row">
+              <span class="label">Telos (Life Purpose)</span>
+              <p id="intent-telos" class="intent-text muted">—</p>
+            </div>
+            <div class="intent-row">
+              <span class="label">Top Priorities</span>
+              <div id="intent-priorities" class="tag-list"></div>
+            </div>
+          </div>
+          <form id="intent-form" class="intent-form" hidden>
+            <label><span>Focus</span><input id="input-intent-focus" required maxlength="120" placeholder="Primary objective..."></label>
+            <label><span>Telos</span><input id="input-intent-telos" maxlength="200" placeholder="Core philosophy or long-term direction..."></label>
+            <label><span>Priorities (comma separated)</span><input id="input-intent-priorities" maxlength="200" placeholder="Priority 1, Priority 2..."></label>
+            <div class="form-actions">
+              <button class="button primary" type="submit">Save Intent</button>
+              <button id="cancel-intent-btn" class="button secondary" type="button">Cancel</button>
+            </div>
+          </form>
+        </section>
+
+        <section id="guidance-widget" class="widget attention-widget" data-widget="guidance" data-widget-label="Agent guidance & attention">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Human-in-the-Loop</p>
+              <h2>Agent guidance & decisions</h2>
+            </div>
+            <span id="guidance-count" class="score">0 pending</span>
+          </div>
+          <div id="guidance-list" class="guidance-list">
+            <p class="empty-state">No agent requests pending your guidance.</p>
+          </div>
+        </section>
+
         <section class="kpi-grid" data-widget="overview" data-widget-label="Operations overview">
           <article class="widget kpi"><span class="label">Connected agents</span><strong id="kpi-connected">—</strong><small id="kpi-connected-note">No snapshot</small></article>
           <article class="widget kpi"><span class="label">Active sessions</span><strong id="kpi-sessions">—</strong><small>Across reported agents</small></article>
           <article class="widget kpi"><span class="label">Tokens consumed</span><strong id="kpi-tokens">—</strong><small>Normalized snapshot total</small></article>
           <article class="widget kpi"><span class="label">Gateway health</span><strong id="kpi-gateway">Unknown</strong><small id="kpi-gateway-note">No gateway data</small></article>
         </section>
+        
+        <section class="widget" data-widget="ledger" data-widget-label="Context Ledger">
+          <div class="section-heading"><div><p class="eyebrow">State</p><h2>Universal Context Ledger</h2></div></div>
+          <div id="ledger-content">
+            <p class="empty-state">No context ledger saved.</p>
+          </div>
+        </section>
 
         <section class="agent-section" data-widget="agents" data-widget-label="Agent fleet">
           <div class="section-heading"><div><p class="eyebrow">Fleet</p><h2>Agent status</h2></div><span id="agent-count" class="muted">4 monitored</span></div>
           <div id="agent-grid" class="agent-grid"></div>
+        </section>
+
+        <section class="widget milestones-widget" data-widget="milestones" data-widget-label="Executive milestones">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Deliverables</p>
+              <h2>Executive milestones</h2>
+            </div>
+            <span class="live-label"><span class="pulse-dot"></span>Milestone stream</span>
+          </div>
+          <ol id="milestone-list" class="timeline">
+            <li class="empty-state">No milestones logged yet.</li>
+          </ol>
         </section>
 
         <section class="widget dreams-widget" data-widget="dreams" data-widget-label="Dreaming log">

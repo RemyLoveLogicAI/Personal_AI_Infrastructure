@@ -1,5 +1,136 @@
 #!/usr/bin/env bun
 /**
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
+- task
  * SecurityPipeline.hook.ts — PreToolUse entry point
  *
  * Runs the inspector pipeline on every Bash, Write, Edit, and MultiEdit
@@ -14,11 +145,13 @@ import { InspectorPipeline } from './security/pipeline';
 import { createPatternInspector } from './security/inspectors/PatternInspector';
 import { createEgressInspector } from './security/inspectors/EgressInspector';
 import { createRulesInspector } from './security/inspectors/RulesInspector';
+import { createGate, checkGate, fingerprintFor } from './security/cockpit';
 
 interface HookInput {
   session_id: string;
   tool_name: string;
   tool_input: Record<string, unknown> | string;
+  agent_type?: string;
 }
 
 const pipeline = new InspectorPipeline([
@@ -43,6 +176,7 @@ async function main(): Promise<void> {
     sessionId: input.session_id,
     toolName: input.tool_name,
     toolInput: input.tool_input,
+    agent_type: input.agent_type,
   };
 
   const result = await pipeline.run(ctx);
@@ -53,7 +187,28 @@ async function main(): Promise<void> {
       process.exit(2);
       break;
 
-    case 'require_approval':
+    case 'require_approval': {
+      // The gate bus is authoritative: a cockpit approval lets this exact
+      // action through once, a recent denial blocks it outright, and an
+      // undecided gate falls back to prompting.
+      const fingerprint = fingerprintFor(input.tool_name, input.tool_input);
+      const decision = await checkGate(fingerprint);
+
+      if (decision === 'deny') {
+        console.error('[PAI SECURITY] 🚫 DENIED by cockpit: ' + (result.reason ?? 'recently denied'));
+        process.exit(2);
+        break;
+      }
+
+      if (decision === 'allow') {
+        console.error('[PAI SECURITY] ✅ approved by cockpit — allowing once');
+        break;
+      }
+
+      // Undecided: record the gate (fire-and-forget) and prompt.
+      createGate('action', 'warning', input.agent_type ?? 'unknown', input.tool_name,
+        result.reason ?? 'Approval required', fingerprint)
+        .catch((e) => console.error('[cockpit] gate creation error:', String(e)))
       console.log(JSON.stringify({
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
@@ -62,6 +217,7 @@ async function main(): Promise<void> {
         },
       }));
       break;
+    }
 
     case 'alert':
       console.error(`[PAI SECURITY] ⚠️ ALERT: ${result.reason}`);

@@ -34,14 +34,17 @@ Library/Logs/
 node_modules/
 .npm
 .yarn
+.next/
 
 # Tooling
-package-lock.json
 .husky/
 
 # Changelog
 CHANGELOG.md
 .pnp.*
+
+# Local Claude settings (machine-specific hooks and paths)
+.claude/settings.local.json
 
 # IDE
 .vscode/
@@ -59,6 +62,7 @@ temp/
 dist/
 build/
 out/
+.next/
 
 # Re-include Pulse Observability built dashboard — must ship in public releases
 # so fresh installs get a working dashboard immediately. The `out/` rule above
@@ -70,7 +74,13 @@ out/
 # Cache
 .cache/
 *.cache
+*.tsbuildinfo
 
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
 # Local-only tool state and vendored checkouts
 .omx/
 .sandbox/
@@ -85,3 +95,33 @@ credentials/
 .claude/pai_updates/
 .claude/pai_backups/
 .claude/.pai-sync-history
+.mcp.json
+.agentsroom/handoff-transcript-*.txt
+.agentsroom/handoff-summary-*.md
+.agentsroom/fork-context-*.txt
+.agents/mcp_config.json
+.omp/mcp.json
+.agents/mcp.json
+# StatsHUD build output
+/StatsHUD/dist/
+/StatsHUD/build/
+/StatsHUD/.next/
+/StatsHUD/node_modules/
+.devin/mcp_config.json
+.aider*
+.grok/config.toml
+
+# Agent runtime/session state — local only, never shared
+.omo/
+.omc/
+
+# Whole agent-harness directories. These are per-machine artifacts the tooling
+# drops into the repo root — sessions, caches, memory mirrors — never project
+# content, and nothing inside them is tracked. Listed here so a fresh clone
+# ignores them on its own, rather than relying on a developer's global
+# git-excludes file that a clone does not carry.
+.agentsroom/
+.omp/
+.devin/
+.grok/
+.freebuff/

@@ -1,4 +1,266 @@
-#!/usr/bin/env bun
+@cache
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
+def greet(name):
+    print(name)
 /**
  * PAI Pulse — The Unified Daemon
  *
@@ -66,6 +328,7 @@ import {
 } from "./lib"
 
 import { startHooks, handleHooksRequestAsync, hooksHealth } from "./modules/hooks"
+import { startGates, handleGatesRequest } from "./modules/gates"
 
 // Conditional imports — modules may not exist yet during incremental migration
 let voiceModule: any = null
@@ -338,6 +601,9 @@ async function main() {
     startHooks(config.hooks ?? { enabled: true })
   }
 
+  startGates()
+  log("info", "Gates module loaded")
+
   if (voiceModule && config.voice?.enabled !== false) {
     voiceModule.startVoice(config.voice)
     log("info", "Voice module loaded")
@@ -395,6 +661,12 @@ async function main() {
       // Voice routes: /notify, /notify/personality, /voice
       if (voiceModule && (pathname === "/notify" || pathname === "/notify/personality" || pathname === "/voice")) {
         const resp = await voiceModule.handleVoiceRequest(req, pathname)
+        if (resp) return resp
+      }
+
+      // HITL gate bus: /api/gates/*
+      if (pathname.startsWith("/api/gates")) {
+        const resp = await handleGatesRequest(req, pathname)
         if (resp) return resp
       }
 

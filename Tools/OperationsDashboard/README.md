@@ -15,6 +15,10 @@ Open http://127.0.0.1:8765. Python 3.10+ is required. Use `--port 8766` if the p
 ## What works
 
 - Operations: OpenClaw, Hermes, Claude Code, and Codex status; session counts, token and credit totals, gateway health, dreaming log entries, timestamps and stale-data indication.
+- Strategic Intent & Telos: View and update your active focus, core Telos, and top priorities to align all autonomous agents.
+- Human-in-the-Loop Guidance Center: Surface pending agent questions and decisions with instant one-click option responses and custom instructions.
+- Universal Context Ledger: Inspect active multi-task handoffs, blockers, and shared memory pointers across agent harnesses.
+- Executive Milestones: Live stream of deliverables and milestones categorized by architecture, feature, refactor, and QA.
 - Manual refresh and automatic refresh every 30 seconds.
 - Snapshot import through the dashboard; invalid snapshots are rejected without replacing the last valid import.
 - Workboard: task creation/status changes/deletion, daily habit checks, memory review, and a graph of user-created knowledge nodes and links.
