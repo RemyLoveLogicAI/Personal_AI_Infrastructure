@@ -40,18 +40,34 @@ interface ProtectedPatterns {
   };
 }
 
+interface ProtectedCategory {
+  description: string;
+  files?: string[];
+  patterns?: string[];
+  exception_files?: string[];
+  validation?: string;
+}
+
 interface ProtectedManifest {
   version: string;
   protected: {
-    [category: string]: {
-      description: string;
-      files?: string[];
-      patterns?: string[];
-      exception_files?: string[];
-      validation?: string;
-    };
-    protected_patterns?: ProtectedPatterns;
+    [category: string]: ProtectedCategory | ProtectedPatterns | undefined;
   };
+}
+
+function isPatternSet(
+  value: ProtectedCategory | ProtectedPatterns | undefined
+): value is ProtectedPatterns {
+  return !!value && 'categories' in value;
+}
+
+function asCategory(
+  value: ProtectedCategory | ProtectedPatterns | undefined
+): ProtectedCategory | undefined {
+  if (!value || isPatternSet(value)) {
+    return undefined;
+  }
+  return value;
 }
 
 // Root of the tree being scanned, and the manifest that judges it. Both are
@@ -173,9 +189,9 @@ function scanPaths(files: string[], manifest: ProtectedManifest, label: string):
 
 function checkForbiddenDirectories(stagedFiles: string[], manifest: ProtectedManifest): string[] {
   const violations: string[] = [];
-  const forbiddenDirs = manifest.protected.forbidden_directories;
+  const forbiddenDirs = asCategory(manifest.protected.forbidden_directories);
 
-  if (!forbiddenDirs || !forbiddenDirs.patterns) {
+  if (!forbiddenDirs?.patterns) {
     return violations;
   }
 
@@ -232,7 +248,8 @@ function scanAllFilesForSensitiveContent(stagedFiles: string[], manifest: Protec
   violations: string[];
 }[] {
   const results: { file: string; violations: string[] }[] = [];
-  const patternCategory = manifest.protected.protected_patterns as ProtectedPatterns | undefined;
+  const rawPatterns = manifest.protected.protected_patterns;
+  const patternCategory = isPatternSet(rawPatterns) ? rawPatterns : undefined;
 
   if (!patternCategory || !patternCategory.categories) {
     return results;
@@ -318,8 +335,9 @@ function getAllProtectedFiles(manifest: ProtectedManifest): string[] {
   const files: string[] = [];
 
   for (const category of Object.values(manifest.protected)) {
-    if (category.files) {
-      files.push(...category.files);
+    const entry = asCategory(category);
+    if (entry?.files) {
+      files.push(...entry.files);
     }
   }
 
@@ -341,7 +359,8 @@ function checkFileContent(filePath: string, manifest: ProtectedManifest): {
   const violations: string[] = [];
 
   // Get exception files list (applies to ALL checks, not just patterns)
-  const patternCategory = manifest.protected.protected_patterns as ProtectedPatterns | undefined;
+  const rawPatterns = manifest.protected.protected_patterns;
+  const patternCategory = isPatternSet(rawPatterns) ? rawPatterns : undefined;
   const exceptions = patternCategory?.exception_files || [];
   const isException = exceptions.includes(filePath);
 
@@ -381,20 +400,21 @@ function checkFileContent(filePath: string, manifest: ProtectedManifest): {
   }
 
   // Check category-specific validation
-  for (const [categoryName, category] of Object.entries(manifest.protected)) {
-    if (!category.files?.includes(filePath) || !category.validation) {
+  for (const category of Object.values(manifest.protected)) {
+    const entry = asCategory(category);
+    if (!entry?.files?.includes(filePath) || !entry.validation) {
       continue;
     }
 
     // Core documents must reference PAI
-    if (category.validation.includes('PAI')) {
+    if (entry.validation.includes('PAI')) {
       if (!content.includes('PAI') && !content.includes('Personal AI Infrastructure')) {
         violations.push(`Missing required reference to "PAI" or "Personal AI Infrastructure"`);
       }
     }
 
     // Must not contain private Kai data (skip if exception file)
-    if (category.validation.includes('private Kai data') && !isException) {
+    if (entry.validation.includes('private Kai data') && !isException) {
       const privatePatterns = [
         /\/Users\/daniel\/\.claude\/skills\/personal/,
         /daemon\.plist/,
@@ -409,7 +429,7 @@ function checkFileContent(filePath: string, manifest: ProtectedManifest): {
     }
 
     // Must not contain secrets (skip if exception file)
-    if (category.validation.includes('secrets') && !isException) {
+    if (entry.validation.includes('secrets') && !isException) {
       const secretPatterns = [
         /ANTHROPIC_API_KEY=sk-/,
         /ELEVENLABS_API_KEY=(?!your_elevenlabs_api_key_here)/,

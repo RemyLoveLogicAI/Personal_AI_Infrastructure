@@ -15,6 +15,6 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "Tools/validate-protected.ts"],
   "exclude": ["node_modules"]
 }
