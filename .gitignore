@@ -114,3 +114,14 @@ credentials/
 # Agent runtime/session state — local only, never shared
 .omo/
 .omc/
+
+# Whole agent-harness directories. These are per-machine artifacts the tooling
+# drops into the repo root — sessions, caches, memory mirrors — never project
+# content, and nothing inside them is tracked. Listed here so a fresh clone
+# ignores them on its own, rather than relying on a developer's global
+# git-excludes file that a clone does not carry.
+.agentsroom/
+.omp/
+.devin/
+.grok/
+.freebuff/
