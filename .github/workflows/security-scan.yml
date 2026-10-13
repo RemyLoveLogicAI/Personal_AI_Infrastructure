@@ -29,7 +29,11 @@ jobs:
           # This job executes code from the checked-out tree. Without this, the
           # GITHUB_TOKEN is written to .git/config and that code can read it.
           persist-credentials: false
-          fetch-depth: 1
+          # Full history so the base revision is already present and the diff
+          # base needs no network fetch. The repository has ~640 commits, so
+          # this is cheap, and it takes an authenticated fetch off the common
+          # path entirely.
+          fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup Bun
@@ -51,7 +55,13 @@ jobs:
           if git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
             exit 0
           fi
-          git -c "http.extraheader=AUTHORIZATION: bearer ${FETCH_TOKEN}" fetch --no-tags --depth=1 origin "${BASE_SHA}"
+          # `persist-credentials: false` leaves no credential helper, so this
+          # fetch has to authenticate itself. Use the scheme actions/checkout
+          # uses for git-over-HTTPS: HTTP Basic with x-access-token as the
+          # username. A bearer header satisfies the REST API but git rejects it,
+          # which is what made this fail with "could not read Username".
+          AUTH=$(printf 'x-access-token:%s' "${FETCH_TOKEN}" | base64 | tr -d '\n')
+          git -c "http.extraheader=AUTHORIZATION: basic ${AUTH}" fetch --no-tags --depth=1 origin "${BASE_SHA}"
 
       # A gate the change under review can rewrite is not a gate. Take both the
       # validator and the manifest from the base revision, run them from outside
@@ -157,6 +167,11 @@ jobs:
   dependency-review:
     # Diffs the dependency manifests, which only exists as a question on a PR.
     if: github.event_name == 'pull_request'
+    # The action hard-errors when the repository's Dependency graph is off, and
+    # it is off here (it is NOT on by default for this repo, whatever the docs
+    # suggest). Report the result without blocking a merge on a setting this
+    # workflow cannot enable.
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -172,6 +187,6 @@ jobs:
         with:
           fail-on-severity: high
           # Report through the workflow summary rather than a PR comment, so the
-          # job needs no write permission. Requires the repository's Dependency
-          # graph, which GitHub enables by default on public repositories.
+          # job needs no write permission. Needs the repository's Dependency
+          # graph, which is off here — hence continue-on-error above.
           comment-summary-in-pr: never

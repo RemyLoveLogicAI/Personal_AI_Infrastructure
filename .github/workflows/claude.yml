@@ -32,6 +32,9 @@ jobs:
       contents: read
       pull-requests: read
       issues: read
+      # The action exchanges an OIDC token. Declaring this block sets every
+      # scope not listed to none, so dropping this line breaks the action.
+      id-token: write
       actions: read # Required for Claude to read CI results on PRs
     steps:
       - name: Checkout repository

@@ -33,6 +33,9 @@ jobs:
       contents: read
       pull-requests: read
       issues: read
+      # The action exchanges an OIDC token. Declaring this block sets every
+      # scope not listed to none, so dropping this line breaks the review.
+      id-token: write
 
     steps:
       - name: Checkout repository
