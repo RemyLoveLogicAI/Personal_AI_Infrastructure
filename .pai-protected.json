@@ -364,10 +364,11 @@
         "Releases/*/.claude/skills/PAI/USER/PAISECURITYSYSTEM/*.yaml",
         "Releases/*/.claude/skills/PAI/PAISECURITYSYSTEM/*.yaml",
         "Releases/*/.claude/skills/Parser/Prompts/*.md",
-        "Releases/*/.claude/skills/Parser/Utils/*.ts"
+        "Releases/*/.claude/skills/Parser/Utils/*.ts",
+        "Releases/*/.claude/PAI/PULSE/pulse.ts"
       ],
       "exception_contexts": {
-        "description": "Patterns that are OK when in documentation/example context",
+        "description": "Patterns that are OK when in documentation/example context. Glob-shaped entries (*.pem, *.key, service-account*.json) exempt the pattern itself rather than a value: an ignore rule or a protected-path list is not a secret, while a concrete filename on the same line still matches.",
         "allowed_prefixes": [
           "# Example:",
           "// Example:",
@@ -440,7 +441,15 @@
           "git@github.com",
           "ssh://",
           "github.com/",
-          "TELOS_DIR"
+          "TELOS_DIR",
+          "*.pem",
+          "*.key",
+          "*.p12",
+          "*.pfx",
+          ".claude/settings.local.json",
+          "service-account*.json",
+          "service_account*.json",
+          "reason:"
         ]
       }
     }

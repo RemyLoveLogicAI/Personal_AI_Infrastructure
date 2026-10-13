@@ -10,10 +10,17 @@
  *   bun ~/Projects/PAI/Tools/validate-protected.ts --staged  (check only staged files)
  *   bun ~/Projects/PAI/Tools/validate-protected.ts --since <rev>  (also scan files changed since rev)
  *   bun ~/Projects/PAI/Tools/validate-protected.ts --tracked  (scan every tracked file)
+ *
+ * --root <dir>      scan another tree instead of this script's parent directory
+ * --manifest <file> read the protected manifest from another location
+ *
+ * The two are combined in CI to run a trusted copy of this script (taken from
+ * the base revision and kept outside the checkout) against the tree under
+ * review, so a pull request cannot replace the gate that judges it.
  */
 
 import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { execFileSync, execSync } from 'child_process';
 
 interface PatternCategory {
@@ -47,8 +54,11 @@ interface ProtectedManifest {
   };
 }
 
-const PAI_ROOT = join(import.meta.dir, '..');
-const MANIFEST_PATH = join(PAI_ROOT, '.pai-protected.json');
+// Root of the tree being scanned, and the manifest that judges it. Both are
+// overridable with --root / --manifest so an out-of-tree copy can scan a tree it
+// does not live in.
+let PAI_ROOT = join(import.meta.dir, '..');
+let MANIFEST_PATH = join(PAI_ROOT, '.pai-protected.json');
 
 // Colors for terminal output
 const RED = '\x1b[31m';
@@ -424,6 +434,19 @@ async function main() {
   const stagedOnly = args.includes('--staged');
   const tracked = args.includes('--tracked');
   const since = optionValue(args, '--since');
+
+  // Resolve the scan target before anything reads the tree or the manifest.
+  const rootArg = optionValue(args, '--root');
+  if (rootArg) {
+    PAI_ROOT = resolve(rootArg);
+    if (!existsSync(PAI_ROOT)) {
+      console.error(`${RED}--root directory does not exist: ${rootArg}${RESET}`);
+      process.exit(2);
+    }
+  }
+
+  const manifestArg = optionValue(args, '--manifest');
+  MANIFEST_PATH = manifestArg ? resolve(manifestArg) : join(PAI_ROOT, '.pai-protected.json');
 
   if ([stagedOnly, tracked, Boolean(since)].filter(Boolean).length > 1) {
     console.error(`${RED}Use only one of --staged, --since, or --tracked${RESET}`);

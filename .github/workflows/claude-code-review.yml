@@ -18,7 +18,17 @@ jobs:
     #   github.event.pull_request.user.login == 'new-developer' ||
     #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
 
+    # A `pull_request` run from a fork never receives CLAUDE_CODE_OAUTH_TOKEN, so
+    # it could only fail. Skip it explicitly; same-repo PRs still get reviewed.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+
     runs-on: ubuntu-latest
+    # The review agent has no ceiling other than GitHub's 6-hour default.
+    timeout-minutes: 30
+    # Supersede a review of a PR that has been pushed to since.
+    concurrency:
+      group: claude-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     permissions:
       contents: read
       pull-requests: read
@@ -28,6 +38,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          # The review agent reads untrusted PR content. Keep the token out of
+          # .git/config so shelled-out code cannot read it.
+          persist-credentials: false
           fetch-depth: 1
 
       - name: Run Claude Code Review
