@@ -1,0 +1,192 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref so a busy branch does not stack jobs.
+concurrency:
+  group: security-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege, declared at the top level so any future job inherits it.
+permissions:
+  contents: read
+
+jobs:
+  validate-protected:
+    runs-on: ubuntu-latest
+    # Bound the job: this runs repo-controlled code, so cap the blast radius.
+    # 10 (not 5) because the --tracked fallback scans every tracked file.
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # This job executes code from the checked-out tree. Without this, the
+          # GITHUB_TOKEN is written to .git/config and that code can read it.
+          persist-credentials: false
+          # Full history so the base revision is already present and the diff
+          # base needs no network fetch. The repository has ~640 commits, so
+          # this is cheap, and it takes an authenticated fetch off the common
+          # path entirely.
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      # Fetch the base in its own step so the validator process never sees the token.
+      - name: Fetch the revision to diff against
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          FETCH_TOKEN: ${{ github.token }}
+        run: |
+          ZERO=0000000000000000000000000000000000000000
+          if [ -z "${BASE_SHA}" ] || [ "${BASE_SHA}" = "$ZERO" ]; then
+            echo "SCAN_MODE=tracked" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "SCAN_MODE=since" >> "$GITHUB_ENV"
+          echo "SCAN_BASE=${BASE_SHA}" >> "$GITHUB_ENV"
+          if git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            exit 0
+          fi
+          # `persist-credentials: false` leaves no credential helper, so this
+          # fetch has to authenticate itself. Use the scheme actions/checkout
+          # uses for git-over-HTTPS: HTTP Basic with x-access-token as the
+          # username. A bearer header satisfies the REST API but git rejects it,
+          # which is what made this fail with "could not read Username".
+          AUTH=$(printf 'x-access-token:%s' "${FETCH_TOKEN}" | base64 | tr -d '\n')
+          git -c "http.extraheader=AUTHORIZATION: basic ${AUTH}" fetch --no-tags --depth=1 origin "${BASE_SHA}"
+
+      # A gate the change under review can rewrite is not a gate. Take both the
+      # validator and the manifest from the base revision, run them from outside
+      # the checkout ($RUNNER_TEMP), and point them back at this tree.
+      - name: Materialize a trusted copy of the gate
+        if: env.SCAN_MODE == 'since'
+        run: |
+          set -euo pipefail
+          TRUSTED="$RUNNER_TEMP/trusted-gate"
+          mkdir -p "$TRUSTED/Tools"
+          # Any missing piece falls back to the in-tree gate rather than failing
+          # the job: the materialize step must never be the thing that breaks CI.
+          if ! git cat-file -e "${SCAN_BASE}^{commit}" 2>/dev/null; then
+            echo "::warning::Base revision ${SCAN_BASE} is unavailable; using the in-tree gate."
+            exit 0
+          fi
+          for path in Tools/validate-protected.ts .pai-protected.json; do
+            if ! git show "${SCAN_BASE}:${path}" > "$TRUSTED/${path}" 2>/dev/null; then
+              echo "::warning::Base revision ${SCAN_BASE} has no ${path}; using the in-tree gate."
+              rm -rf "$TRUSTED"
+              exit 0
+            fi
+          done
+          echo "TRUSTED_GATE=${TRUSTED}" >> "$GITHUB_ENV"
+
+      - name: Validate protected files and scan the change
+        run: |
+          set -euo pipefail
+
+          if [ "${SCAN_MODE}" = "tracked" ]; then
+            echo "No parent revision. Scanning every tracked file."
+            bun Tools/validate-protected.ts --tracked
+            exit 0
+          fi
+
+          TRUSTED="${TRUSTED_GATE:-}"
+
+          # Steady state: the trusted gate runs from outside the checkout, is
+          # pointed back at this tree by --root, and judges it with the trusted
+          # manifest. This tree's own copies of the gate files are still
+          # content-scanned, so a secret planted inside them is not overlooked.
+          if [ -n "$TRUSTED" ] && grep -q -- '--root' "$TRUSTED/Tools/validate-protected.ts" 2>/dev/null; then
+            bun "$TRUSTED/Tools/validate-protected.ts" \
+              --root "$GITHUB_WORKSPACE" \
+              --manifest "$TRUSTED/.pai-protected.json" \
+              --since "${SCAN_BASE}"
+            exit 0
+          fi
+
+          # One-time bootstrap, crossed exactly once. Until a revision carrying
+          # --root reaches main, the base gate cannot be pointed at another tree
+          # (and an older base gate does not even scan a change), so the gate in
+          # the tree under review is the only one that can scan. Trusted mode
+          # takes over automatically on the next revision after this lands.
+          echo "::notice::Base gate predates --root support; scanning with the in-tree gate. Trusted mode starts with the next revision."
+          bun Tools/validate-protected.ts --since "${SCAN_BASE}"
+
+  # The protected-file job is a content gate over the repo's own patterns: it
+  # matches known-sensitive shapes, it does not hunt credentials generally.
+  # This job is the credential scanner.
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          # The scan walks the commits in the change, so it needs history.
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        env:
+          # Pinned version AND the sha256 of that exact release tarball. The
+          # upstream GitHub Action is licensed per-organization; the MIT CLI is
+          # not, so the CLI is what runs here.
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          set -euo pipefail
+          ARCHIVE="/tmp/gitleaks.tar.gz"
+          curl -sSfL -o "$ARCHIVE" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
+          sudo tar -xzf "$ARCHIVE" -C /usr/local/bin gitleaks
+          gitleaks version
+
+      - name: Scan the change for secrets
+        run: |
+          set -euo pipefail
+          ZERO=0000000000000000000000000000000000000000
+          BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$BASE" ] || [ "$BASE" = "$ZERO" ]; then
+            # No parent revision (first push of a branch): scan the whole tree.
+            gitleaks git --redact --verbose .
+          else
+            # --redact keeps a matched secret out of the job log.
+            gitleaks git --redact --verbose --log-opts="${BASE}..HEAD" .
+          fi
+
+  dependency-review:
+    # Diffs the dependency manifests, which only exists as a question on a PR.
+    if: github.event_name == 'pull_request'
+    # The action hard-errors when the repository's Dependency graph is off, and
+    # it is off here (it is NOT on by default for this repo, whatever the docs
+    # suggest). Report the result without blocking a merge on a setting this
+    # workflow cannot enable.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          fail-on-severity: high
+          # Report through the workflow summary rather than a PR comment, so the
+          # job needs no write permission. Needs the repository's Dependency
+          # graph, which is off here — hence continue-on-error above.
+          comment-summary-in-pr: never

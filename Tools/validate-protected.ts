@@ -8,11 +8,20 @@
  * Usage:
  *   bun ~/Projects/PAI/Tools/validate-protected.ts
  *   bun ~/Projects/PAI/Tools/validate-protected.ts --staged  (check only staged files)
+ *   bun ~/Projects/PAI/Tools/validate-protected.ts --since <rev>  (also scan files changed since rev)
+ *   bun ~/Projects/PAI/Tools/validate-protected.ts --tracked  (scan every tracked file)
+ *
+ * --root <dir>      scan another tree instead of this script's parent directory
+ * --manifest <file> read the protected manifest from another location
+ *
+ * The two are combined in CI to run a trusted copy of this script (taken from
+ * the base revision and kept outside the checkout) against the tree under
+ * review, so a pull request cannot replace the gate that judges it.
  */
 
 import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
-import { execSync } from 'child_process';
+import { join, resolve } from 'path';
+import { execFileSync, execSync } from 'child_process';
 
 interface PatternCategory {
   description: string;
@@ -31,22 +40,41 @@ interface ProtectedPatterns {
   };
 }
 
+interface ProtectedCategory {
+  description: string;
+  files?: string[];
+  patterns?: string[];
+  exception_files?: string[];
+  validation?: string;
+}
+
 interface ProtectedManifest {
   version: string;
   protected: {
-    [category: string]: {
-      description: string;
-      files?: string[];
-      patterns?: string[];
-      exception_files?: string[];
-      validation?: string;
-    };
-    protected_patterns?: ProtectedPatterns;
+    [category: string]: ProtectedCategory | ProtectedPatterns | undefined;
   };
 }
 
-const PAI_ROOT = join(import.meta.dir, '..');
-const MANIFEST_PATH = join(PAI_ROOT, '.pai-protected.json');
+function isPatternSet(
+  value: ProtectedCategory | ProtectedPatterns | undefined
+): value is ProtectedPatterns {
+  return !!value && 'categories' in value;
+}
+
+function asCategory(
+  value: ProtectedCategory | ProtectedPatterns | undefined
+): ProtectedCategory | undefined {
+  if (!value || isPatternSet(value)) {
+    return undefined;
+  }
+  return value;
+}
+
+// Root of the tree being scanned, and the manifest that judges it. Both are
+// overridable with --root / --manifest so an out-of-tree copy can scan a tree it
+// does not live in.
+let PAI_ROOT = join(import.meta.dir, '..');
+let MANIFEST_PATH = join(PAI_ROOT, '.pai-protected.json');
 
 // Colors for terminal output
 const RED = '\x1b[31m';
@@ -76,11 +104,94 @@ function getStagedFiles(): string[] {
   }
 }
 
+function gitLines(args: string[]): string {
+  return execFileSync('git', args, {
+    cwd: PAI_ROOT,
+    encoding: 'utf-8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
+function listPaths(output: string): string[] {
+  return output.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+}
+
+// A revision is a commit-ish passed to git, never a shell string.
+function assertRevision(since: string): void {
+  if (since.startsWith('-') || since.includes('..') || !/^[A-Za-z0-9._~^/@+-]+$/.test(since)) {
+    console.error(`${RED}Invalid --since revision. Pass a commit or branch name.${RESET}`);
+    process.exit(2);
+  }
+}
+
+function getChangedFiles(since: string): string[] {
+  assertRevision(since);
+  try {
+    gitLines(['rev-parse', '--verify', '--quiet', `${since}^{commit}`]);
+  } catch {
+    console.error(`${RED}--since revision not found: ${since}${RESET}`);
+    process.exit(1);
+  }
+
+  // Two trees, not three-dot. A shallow CI checkout has the base commit and
+  // HEAD, and often no merge base. Two-dot still lists every path whose
+  // content differs, which is the change a pull request or push would land.
+  return listPaths(gitLines(['diff', '--name-only', '--diff-filter=ACMR', since, 'HEAD']));
+}
+
+function getTrackedFiles(): string[] {
+  return listPaths(gitLines(['ls-files']));
+}
+
+function optionValue(args: string[], name: string): string | undefined {
+  const index = args.indexOf(name);
+  if (index === -1) {
+    return undefined;
+  }
+  const value = args[index + 1];
+  if (!value || value.startsWith('--')) {
+    console.error(`${RED}Missing value for ${name}${RESET}`);
+    process.exit(2);
+  }
+  return value;
+}
+
+function scanPaths(files: string[], manifest: ProtectedManifest, label: string): boolean {
+  const forbiddenViolations = checkForbiddenDirectories(files, manifest);
+  if (forbiddenViolations.length > 0) {
+    console.log(`\n${RED}🚫 FORBIDDEN DIRECTORIES DETECTED${RESET}\n`);
+    for (const violation of forbiddenViolations) {
+      console.log(`${RED}❌${RESET} ${violation}`);
+    }
+  }
+
+  console.log(`\n${YELLOW}Scanning ${files.length} ${label} for sensitive content...${RESET}\n`);
+  const sensitiveResults = scanAllFilesForSensitiveContent(files, manifest);
+  if (sensitiveResults.length > 0) {
+    console.log(`${RED}🚫 SENSITIVE CONTENT DETECTED${RESET}\n`);
+    for (const result of sensitiveResults) {
+      console.log(`${RED}❌${RESET} ${result.file}`);
+      for (const violation of result.violations) {
+        console.log(`   ${RED}→${RESET} ${violation}`);
+      }
+    }
+  }
+
+  if (forbiddenViolations.length === 0 && sensitiveResults.length === 0) {
+    console.log(`${GREEN}✅ No sensitive content in ${label}${RESET}\n`);
+    return false;
+  }
+
+  console.log('\n' + '='.repeat(60));
+  console.log(`\n${RED}🚫 CHANGE SCAN FAILED${RESET}\n`);
+  return true;
+}
+
 function checkForbiddenDirectories(stagedFiles: string[], manifest: ProtectedManifest): string[] {
   const violations: string[] = [];
-  const forbiddenDirs = manifest.protected.forbidden_directories;
+  const forbiddenDirs = asCategory(manifest.protected.forbidden_directories);
 
-  if (!forbiddenDirs || !forbiddenDirs.patterns) {
+  if (!forbiddenDirs?.patterns) {
     return violations;
   }
 
@@ -137,7 +248,8 @@ function scanAllFilesForSensitiveContent(stagedFiles: string[], manifest: Protec
   violations: string[];
 }[] {
   const results: { file: string; violations: string[] }[] = [];
-  const patternCategory = manifest.protected.protected_patterns as ProtectedPatterns | undefined;
+  const rawPatterns = manifest.protected.protected_patterns;
+  const patternCategory = isPatternSet(rawPatterns) ? rawPatterns : undefined;
 
   if (!patternCategory || !patternCategory.categories) {
     return results;
@@ -223,8 +335,9 @@ function getAllProtectedFiles(manifest: ProtectedManifest): string[] {
   const files: string[] = [];
 
   for (const category of Object.values(manifest.protected)) {
-    if (category.files) {
-      files.push(...category.files);
+    const entry = asCategory(category);
+    if (entry?.files) {
+      files.push(...entry.files);
     }
   }
 
@@ -246,7 +359,8 @@ function checkFileContent(filePath: string, manifest: ProtectedManifest): {
   const violations: string[] = [];
 
   // Get exception files list (applies to ALL checks, not just patterns)
-  const patternCategory = manifest.protected.protected_patterns as ProtectedPatterns | undefined;
+  const rawPatterns = manifest.protected.protected_patterns;
+  const patternCategory = isPatternSet(rawPatterns) ? rawPatterns : undefined;
   const exceptions = patternCategory?.exception_files || [];
   const isException = exceptions.includes(filePath);
 
@@ -286,20 +400,21 @@ function checkFileContent(filePath: string, manifest: ProtectedManifest): {
   }
 
   // Check category-specific validation
-  for (const [categoryName, category] of Object.entries(manifest.protected)) {
-    if (!category.files?.includes(filePath) || !category.validation) {
+  for (const category of Object.values(manifest.protected)) {
+    const entry = asCategory(category);
+    if (!entry?.files?.includes(filePath) || !entry.validation) {
       continue;
     }
 
     // Core documents must reference PAI
-    if (category.validation.includes('PAI')) {
+    if (entry.validation.includes('PAI')) {
       if (!content.includes('PAI') && !content.includes('Personal AI Infrastructure')) {
         violations.push(`Missing required reference to "PAI" or "Personal AI Infrastructure"`);
       }
     }
 
     // Must not contain private Kai data (skip if exception file)
-    if (category.validation.includes('private Kai data') && !isException) {
+    if (entry.validation.includes('private Kai data') && !isException) {
       const privatePatterns = [
         /\/Users\/daniel\/\.claude\/skills\/personal/,
         /daemon\.plist/,
@@ -314,7 +429,7 @@ function checkFileContent(filePath: string, manifest: ProtectedManifest): {
     }
 
     // Must not contain secrets (skip if exception file)
-    if (category.validation.includes('secrets') && !isException) {
+    if (entry.validation.includes('secrets') && !isException) {
       const secretPatterns = [
         /ANTHROPIC_API_KEY=sk-/,
         /ELEVENLABS_API_KEY=(?!your_elevenlabs_api_key_here)/,
@@ -337,12 +452,42 @@ function checkFileContent(filePath: string, manifest: ProtectedManifest): {
 async function main() {
   const args = process.argv.slice(2);
   const stagedOnly = args.includes('--staged');
+  const tracked = args.includes('--tracked');
+  const since = optionValue(args, '--since');
+
+  // Resolve the scan target before anything reads the tree or the manifest.
+  const rootArg = optionValue(args, '--root');
+  if (rootArg) {
+    PAI_ROOT = resolve(rootArg);
+    if (!existsSync(PAI_ROOT)) {
+      console.error(`${RED}--root directory does not exist: ${rootArg}${RESET}`);
+      process.exit(2);
+    }
+  }
+
+  const manifestArg = optionValue(args, '--manifest');
+  MANIFEST_PATH = manifestArg ? resolve(manifestArg) : join(PAI_ROOT, '.pai-protected.json');
+
+  if ([stagedOnly, tracked, Boolean(since)].filter(Boolean).length > 1) {
+    console.error(`${RED}Use only one of --staged, --since, or --tracked${RESET}`);
+    process.exit(2);
+  }
 
   console.log(`\n${BLUE}🛡️  PAI Protected Files Validator${RESET}\n`);
   console.log('='.repeat(60));
 
   const manifest = loadManifest();
   const allProtectedFiles = getAllProtectedFiles(manifest);
+
+  // Secret and forbidden-directory checks used to run only for --staged.
+  // CI has an empty index, so a pull request never reached them.
+  let changeSetFailed = false;
+  if (since) {
+    const changed = getChangedFiles(since);
+    changeSetFailed = scanPaths(changed, manifest, `file(s) changed since ${since}`);
+  } else if (tracked) {
+    changeSetFailed = scanPaths(getTrackedFiles(), manifest, 'tracked file(s)');
+  }
 
   // Determine which files to check
   let filesToCheck: string[];
@@ -459,6 +604,9 @@ async function main() {
     console.log('  3. Remove references to private Kai data');
     console.log('  4. Ensure PAI-specific files reference "PAI" not "Kai"');
     console.log('\n📖 See .pai-protected.json for details\n');
+  }
+
+  if (hasViolations || changeSetFailed) {
     process.exit(1);
   } else {
     console.log(`\n${GREEN}✅ All protected files validated successfully!${RESET}\n`);

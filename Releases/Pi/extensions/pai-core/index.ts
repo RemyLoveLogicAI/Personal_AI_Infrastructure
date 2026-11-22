@@ -13,7 +13,7 @@
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-import { execSync, spawn } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import { existsSync, mkdirSync, writeFileSync, readFileSync, appendFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
@@ -29,6 +29,34 @@ const STATE_DIR = join(MEMORY_DIR, "state");
 const VOICE_ENDPOINT = process.env.PAI_VOICE_ENDPOINT || "http://localhost:8888/notify";
 const VOICE_ID = process.env.PAI_VOICE_ID || "";
 const VOICE_ENABLED = process.env.PAI_VOICE_ENABLED === "true";
+
+function postVoice(message: string): void {
+  const result = spawnSync(
+    "curl",
+    [
+      "-s",
+      "-X",
+      "POST",
+      VOICE_ENDPOINT,
+      "-H",
+      "Content-Type: application/json",
+      "--connect-timeout",
+      "1",
+      "-m",
+      "5",
+      "-d",
+      JSON.stringify({
+        message,
+        voice_id: VOICE_ID,
+        voice_enabled: true,
+      }),
+    ],
+    { timeout: 5000 },
+  );
+  if (result.error || result.status !== 0) {
+    throw result.error ?? new Error(`curl exited ${result.status}`);
+  }
+}
 
 // Ensure directories exist
 for (const dir of [MEMORY_DIR, WORK_DIR, LEARNING_DIR, STATE_DIR]) {
@@ -50,14 +78,7 @@ export default function (pi: ExtensionAPI) {
       }
 
       try {
-        execSync(
-          `curl -s -X POST ${VOICE_ENDPOINT} -H "Content-Type: application/json" -d '${JSON.stringify({
-            message: params.message,
-            voice_id: VOICE_ID,
-            voice_enabled: true,
-          })}'`,
-          { timeout: 5000 }
-        );
+        postVoice(params.message);
         return { content: [{ type: "text", text: `Voice: "${params.message}"` }] };
       } catch {
         return { content: [{ type: "text", text: "Voice server unavailable" }] };
@@ -319,14 +340,7 @@ ${criteriaBlock}
       if (!VOICE_ENABLED || !VOICE_ID) return;
       const message = args || "Hello from PAI";
       try {
-        execSync(
-          `curl -s -X POST ${VOICE_ENDPOINT} -H "Content-Type: application/json" -d '${JSON.stringify({
-            message,
-            voice_id: VOICE_ID,
-            voice_enabled: true,
-          })}'`,
-          { timeout: 5000 }
-        );
+        postVoice(message);
       } catch {
         // Voice server may not be running
       }

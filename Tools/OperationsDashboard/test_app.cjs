@@ -35,5 +35,46 @@ function boot(){
  for(const label of ['Agents','Knowledge']){app.controls['node-label'].value=label;app.submit('node-form');}
  let saved=JSON.parse(stored);app.controls['link-source'].value=saved.nodes[0].id;app.controls['link-target'].value=saved.nodes[1].id;app.submit('link-form');assert.equal(JSON.parse(stored).links.length,1);
  app.controls['node-list'].children[0].children[1].events.click();saved=JSON.parse(stored);assert.equal(saved.nodes.length,1);assert.equal(saved.links.length,0);
- console.log('PASS: unknown telemetry, task persistence, habit check, memory review, graph link and cascading removal');
+
+ // Test User Intent form submission
+ app.controls['input-intent-focus'].value = 'Elevate PAI Infrastructure';
+ app.controls['input-intent-telos'].value = 'Human-centric AI synergy';
+ app.controls['input-intent-priorities'].value = 'Universality, Proactive HUD';
+ app.submit('intent-form');
+ assert.equal(app.controls['intent-focus'].textContent, 'Elevate PAI Infrastructure');
+ assert.equal(app.controls['intent-telos'].textContent, 'Human-centric AI synergy');
+
+ // Test Guidance rendering and resolution
+ app.run(`
+   snapshot.guidance = [{
+     id: 'g-1',
+     agent: 'Hermes',
+     question: 'Run migration?',
+     options: ['Yes', 'No'],
+     status: 'pending',
+     time: '2026-01-01T00:00:00Z'
+   }];
+   renderGuidance();
+ `);
+ assert.equal(app.controls['guidance-count'].textContent, '1 pending');
+ const yesBtn = app.controls['guidance-list'].children[0].children[2].children[0];
+ await yesBtn.events.click();
+ assert.equal(app.controls['guidance-count'].textContent, '0 pending');
+
+ // Test Milestones rendering
+ app.run(`
+   snapshot.milestones = [{
+     id: 'm-1',
+     agent: 'Codex',
+     title: 'Universal Context Ledger Launched',
+     description: 'Connected cross-harness state to dashboard',
+     category: 'feature',
+     time: '2026-01-01T00:00:00Z',
+     artifacts: ['Tools/HarnessEnhancements/TelemetryMCP/index.js']
+   }];
+   renderMilestones();
+ `);
+ assert.equal(app.controls['milestone-list'].children.length, 1);
+
+ console.log('PASS: unknown telemetry, task persistence, habit check, memory review, graph link, intent form, guidance resolution, and milestones');
 })().catch(error=>{console.error(error);process.exitCode=1;});

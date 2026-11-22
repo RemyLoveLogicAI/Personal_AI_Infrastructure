@@ -58,7 +58,10 @@ function loadPatterns(): PatternsConfig | null {
     const content = readFileSync(patternsPath, 'utf-8');
     patternsCache = parseYaml(content) as PatternsConfig;
     return patternsCache;
-  } catch {
+  } catch (e) {
+    // A malformed file fails identically to an absent one, so name the file
+    // and the reason here rather than letting callers report "missing".
+    console.error(`[PAI SECURITY] could not parse ${patternsPath}: ${String(e)}`);
     return null;
   }
 }
